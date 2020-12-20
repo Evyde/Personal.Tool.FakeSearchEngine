@@ -1,16 +1,18 @@
 from django.shortcuts import render
+import models
 
 def index(request):
     return render(request, 'Google.html')
 
 def search(request):
-    randomName = "asdasdasd" + request.GET['q']
+    randomName = "以下是您搜索的答案，请享用！" + request.GET['q']
+    rtnDict = models.searchFromInputBox(request.GET['q'])
     nie = [{
         "link": "asdoasdhiajksd",
         "linkEnd": "aqqq21",
-        "title": "fuck",
+        "title": rtnDict['answerDicts'][0]['question'],
         "mixup": "混淆专用",
-        "answer": "第一题选A",
+        "answer": rtnDict['answerDicts'][0]['answer'],
         "randomName": randomName
 
     },
@@ -24,4 +26,4 @@ def search(request):
 
         }
     ]
-    return render(request, 's.html', {"nice": nie, "randomName": randomName, "items": "6000", "randomSec": "50"})
+    return render(request, 's.html', {"nice": nie, "randomName": randomName, "items": rtnDict['questionNum'], "randomSec": "50"})

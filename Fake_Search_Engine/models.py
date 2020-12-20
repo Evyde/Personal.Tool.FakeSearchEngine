@@ -2,8 +2,7 @@ from urllib import parse
 import requests
 import re
 import Exceptions
-import getter
-import time
+from utils import getter
 import configparser
 import threading
 from functools import cmp_to_key
@@ -13,156 +12,63 @@ __header = {
     'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
     'Authorization': ""
 }
-
-__oriInput = "搜索框输入的字符串"
-__questionList = []
-__answerList = []
+__answerDicts = []
 __token = "test123"
 
-# searched = 1
-# tasks = 0
+
+def __save(dicto):
+    # list是线程安全的，不必设计锁
+    __answerDicts.append(dicto)
 
 
-#早上干脆重写了一遍，思路极其简单，我这儿反正能跑
-
-
-
-
-
-def textProcessing(input):
-    input.replace(' ', '')
-    questionList = re.split(
-        '1.|2.|3.|4.|5.|6.|7.|8.|9.|10.|11.|12.|13.|14.|15.|16.|17.|18.|19.|20.|21.|22.|23.|24.|25.|26.|27.|28.|29.|30.|31.|32.|33.|34.|35.|36.|37.|38.|39.|40.|41.|42.|43.|44.|45.|46.|47.|48.|49.|50.',
-        input)
-    return questionList
-# 处理题干字符串，生成一个不含题号、空格，只有一堆题干的列表
-
-def findingAndCombining(questionList):
-    urList = []
-    i = 0
-    for i in range(0,20):
-        currentQuestion = questionList[i]
-        currentAnswer = requests.get(
-            "https://api.gochati.cn/jsapi.php?token=test123&q=" + parse.quote(currentQuestion).text)
-        urList.append(currentAnswer)
-        i = i + 1
-    return urList
-# 得到形如   [{题目字典},{题目字典},......,{题目字典}]   的列表
-
-def getUrAnswer(__oriInput):
-    answerList = findingAndCombining(textProcessing(__oriInput))
-    return answerList
-# 直接用这个就行
-
-
-def save(dicto):
-    __questionList.append(dicto)
-
-
-def detectQuestionID(question):
-    listOrig = re.findall("(\d+).", question)  # 挑出数字
-    numMidd = listOrig[0]
-    # 合并list，以防ocr空格分开数字
-    num = int(numMidd)
-    return num
-
-
-# 提取题号
-
-
-def preProcessQuestion(question):
-    m1 = question.split('A', 2)  # 以A为分割
-    question = m1[0]  # 取前一半
-    splitChar = "分)"
-    if "分）" in question:
-        splitChar = "分）"
-    n1 = list(question.split(splitChar, 2))
-    n1.pop(0)
-    return n1[0]
-
-
-# 预提取题干（带题号）
-
-def removeQuestionNum(question):
-    if re.findall("(\d+).", question):
-        question = question.replace(".", "", 1)
-        question = question.replace(str(re.findall("(\d+)", question)[0]), "", 1)
-    else:
-        question = question.replace(str(re.findall("(\d+)", question)[0]), "", 1)
-    return question
-
-
-# 删除题干的题号
-
-
-def detectQuestion(question):
-    n1 = preProcessQuestion(question)
-    question = ""
-    for i in n1:
-        question += i
-    question = removeQuestionNum(question)
-    return question
-
-
-def getFromBaidu(question):
+def __getFromBaidu(question):
     return str(f"没有，前往<a href=\"https://zhidao.baidu.com/search?word={question}\">百度知道</a>或者<a href=\"https://www.baidu.com/s?q={question}\">百度</a>")
 
 
-def findAnswer(a, times, source=None):
+def __findAnswer(a, times, source=None):
     if source is None:
         source = a.copy()
     if times > 4:
         raise Exceptions.NoAnswerFoundAtAll
-    g = getter.getter()
-    str = ""
-    j = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'] # 此处由API总数决定
+    g = getter()
+    tmpStr = ""
+    # 此处由API总数决定
+    romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
     h = 0
     try:
-        tmp = g.get({'q': a['question'], 'token': __token})
+        tmpDict = g.get({'q': a['question'], 'token': __token})
     except Exceptions.NoAnswerFound:
         if times == 0:
-            return findAnswer(a, times + 1, source)
+            return __findAnswer(a, times + 1, source)
         try:
             tmpA = a.copy()
-            tmpA['question'] = textProcess(tmpA['question'], times + 1)
-            r = findAnswer(tmpA, times + 1, source)
+            tmpA['question'] = __textProcess(tmpA['question'], times + 1)
+            r = __findAnswer(tmpA, times + 1, source)
         except Exceptions.NoAnswerFoundAtAll:
-            return {'id': a['id'], 'question': a['question'], 'answer': getFromBaidu(source['question'])}
+            a['question'] = a['question'] + "Zhidao_百度知道"
+            return {'id': a['id'], 'question': a['question'], 'answer': __getFromBaidu(source['question'])}
         else:
             r['question'] = a['question']
             return r
     else:
-        for i in tmp:
+        for i in tmpDict:
             if i['answer'] == "":
                 continue
-            str += j[h] + ". : " + i['answer']
-            str += "\1"
+            tmpStr += romans[h] + ". : " + i['answer']
+            tmpStr += "\1"
             h += 1
-        return {'section': a['section'], 'id': a['id'], 'question': a['question'], 'answer': str,
-                'relativeID': a['relativeID']}
+        return {'id': a['id'], 'question': a['question'], 'answer': tmpStr}
 
 
-def threadSearch(cf, st, en):
-    loop = 1
+def __threadSearch(qDicts):
     global searched, tasks
-    for i in cf.sections():
-        if loop < st:
-            loop += 1
-            continue
-        if loop >= en:
-            break
-        #print("查找中...第%s(%d/%d)题 : " % (i, searched, tasks) + cf.get(i, "question"))
-        searched += 1
-        dic = {'section': i, 'id': cf.get(i, "id"), 'question': cf.get(i, "question"), "type": cf.get(i, "type"),
-               'relativeID': cf.get(i, "relativeID")}
-        a = findAnswer(dic, 0, dic)
+    for i in qDicts:
+        a = __findAnswer(i, 0, i)
         if a['answer'] != "":
-            cf.remove_section(i)
-            save(a)
-        loop += 1
+            __save(a)
 
 
-def textProcess(text, times):
+def __textProcess(text, times):
     targetText = text
     if times == 1:
         targetText = targetText.strip()
@@ -194,201 +100,63 @@ def textProcess(text, times):
     return targetText
 
 
-def sortByEleID(a, b):
-    a1, a2 = a['section'].split("-", 2)
-    b1, b2 = b['section'].split("-", 2)
-    a1 = int(a1)
-    b1 = int(b1)
-    a2 = int(a2)
-    b2 = int(b2)
+def __sortByEleID(a, b):
+    a1 = int(a['id'])
+    b1 = int(b['id'])
     if a1 > b1:
         return 1
     elif a1 < b1:
         return -1
-    if a2 > b2:
-        return 1
     else:
-        return -1
+        return 0
 
 
-def startSearch(threadNum=1, file="questions.ini", write=True):
-    # 初始化题目文件
-    global __questionList, tasks
-    cfg = configparser.ConfigParser()
-    cfg.read(file, encoding="gbk")
-    tasks = int(cfg.sections().__len__())
-
+def __startSearch(tasks, threadNum=1, questionDicts=None):
+    if questionDicts is None:
+        questionDicts = []
+    global __answerDicts
     t = []
     for i in range(0, threadNum):
         maxRange = tasks * (i + 1) / threadNum + 1
         minRange = tasks * i / threadNum + 1
-        t.append(threading.Thread(target=threadSearch, args=(cfg, minRange, maxRange)))
+        t.append(threading.Thread(target=__threadSearch, args=(questionDicts[minRange: maxRange])))
         t[i].start()
-
     for i in t:
         i.join()
-
-    if write:
-        with open(file, "w+") as f:
-            cfg.write(f)
-            f.close()
-    del cfg
-    __questionList.sort(key=cmp_to_key(sortByEleID))
-    cfg = configparser.ConfigParser()
-    for i in __questionList:
-        cfg.add_section(i['section'])
-        cfg.set(i['section'], "ID", i['id'])
-        cfg.set(i['section'], "relativeID", i['relativeID'])
-        cfg.set(i['section'], "question", i['question'])
-        cfg.set(i['section'], "answer", i['answer'])
-    foundAnswers = int(cfg.sections().__len__())
-    with open("answers.ini", "w", encoding="utf-8") as f:
-        cfg.write(f)
-        f.close()
-    del cfg
-    return foundAnswers
+    __answerDicts.sort(key=cmp_to_key(__sortByEleID))
 
 
-def oneToN(str):
-    return str.replace("\1", "\n", 999)
+def __detectQuestionNum(questions):
+    # 最后一题题号 - 第一题题号
+    return int(str(questions).split('.')[-1]) - int(str(questions).split('.')[0])
 
 
-def nToOne(str):
-    return str.replace("\n", "\1", 999)
-
-
-def yourMode(modeChoice):
-    manualMode = False
-    if modeChoice == "y":
-        manualMode = True
-    if modeChoice == "n":
-        manualMode = False
-    return manualMode
-
-
-lastString = ""
-
-# 初始化AipOcr
-
-tmp = ""
-baiduAPI = False
-
-cfg = configparser.ConfigParser()
-
-initFlag = True
-numOfQuestions = 0
-nowNum = 0
-tp = 0
-lastType = -1
-threadNum = 1
-uniCopy = False
-
-manualMode = False
-searchingMode = str(input("搜题模式？y/N"))
-
-if yourMode(searchingMode):
-    startSearch(threadNum, "questions1.ini", False)
-    quit()
-
-modeChoice = str(input("是否选择紧急模式？y/N"))
-startTime = time.time()
-if yourMode(modeChoice):
-    while 51 >= nowNum:
-        if baiduAPI:
-            try:
-                tmp = getDataOCR(0)
-            except Exceptions.ClipNotIMG:
-                tmp = getDataPaste("")
-            except:
-                continue
+def __getQuestionDict(q):
+    i = 0
+    tmpList = re.split(r"(\d+)\.", q)
+    questionDicts = []
+    for qs in tmpList:
+        if i / 2 == 0:
+            questionDicts.append({"id": qs, "question": ""})
         else:
-            tmp = getDataPaste(tmp)
-            if tmp == "":
-                continue
-        if lastString == textProcess(tmp, 1):
-            endTime = time.time()
-            if endTime - startTime >= 3000:
-                quit()
-            continue
-        else:
-            startTime = time.time()
-            lastString = textProcess(tmp, 1)
-            nowNum += 1
-            # print(findAnswer(
-            #      {'section': "0-0", 'relativeID': 0, 'id': 0, 'question': textProcess(tmp, 1),
-            #      'type': 0}, 0)['answer'])
+            questionDicts[int((i - 1) / 2)]['question'] = qs
+        i += 1
+    return questionDicts
 
-#print("开始初始化...")
-# initFlag = False
-# numOfQuestions = 2
-while initFlag:
-    try:
-        numOfQuestions = detectQuestionNum(getDataOCR(0))
-    except:
-        continue
-    else:
-        initFlag = False
-#print("初始化完成！")
-#print("开始获取题目内容...")
-while (nowNum - numOfQuestions) != 0:
-    if uniCopy:
-        time.sleep(1)
-    try:
-        tmp = getDataOCR(0)
-        uniCopy = False
-    except Exceptions.ClipNotIMG:
-        tmp = getDataPaste("")
-        if tmp == "":
-            continue
-        uniCopy = True
-    except:
-        continue
-    if not uniCopy:
-        if lastString == detectQuestion(textProcess(tmp, 1)):
-            continue
-    else:
-        if lastString == textProcess(tmp, 1):
-            continue
-        if int(detectQuestionType(textProcess(tmp, 1))) != 3:
-            if lastType != int(detectQuestionType(textProcess(tmp, 1))):
-                lastType = int(detectQuestionType(textProcess(tmp, 1)))
-                tmp = preProcessQuestion(textProcess(tmp, 1))
-                pyperclip.copy(tmp)
-                continue
-    q = textProcess(tmp, 1)
+
+def searchFromInputBox(questions):
+    initFlag = True
+    nowNum = 0
+    threadNum = 1
+    while initFlag:
+        try:
+            numOfQuestions = __detectQuestionNum(questions)
+        except:
+            return [{"question": "Error!", "answer": "提取题号错误！"}]
+        else:
+            initFlag = False
+
+    q = __textProcess(questions, 1)
     nowNum += 1
-    try:
-        if not uniCopy:
-            lastString = detectQuestion(q)
-            lastType = int(detectQuestionType(q))
-            rID = detectQuestionID(preProcessQuestion(q))
-            q = detectQuestion(q)
-            #print("第%s(%d/%d)题 : " % (str(lastType + 1) + "-" + str(rID), nowNum, numOfQuestions) + q)
-        else:
-            lastString = q
-            rID = detectQuestionID(q)
-            q = removeQuestionNum(q)
-            #print("第%s(%d/%d)题 : " % (str(lastType + 1) + "-" + str(rID), nowNum, numOfQuestions) + q)
-        section = str(lastType + 1) + "-" + str(rID)
-        cfg.add_section(section)
-        cfg.set(section, "ID", str(nowNum))
-        cfg.set(section, "relativeID", str(rID))
-        cfg.set(section, "question", q)
-        cfg.set(section, "type", str(lastType))
-    except:
-        nowNum -= 1
-        continue
-
-with open("questions.ini", "w", encoding="utf-8") as f:
-    cfg.write(f)
-    f.close()
-    del cfg
-os.popen("cp /y questions.ini questions1.ini")  # Linux把copy改成cp
-#print("开始查找(%d线程)..." % threadNum)
-fdA = startSearch(threadNum)
-#print("正在推送...")
-j = 1
-for i in __questionList:
-    #print("第%s题(%d/%d/%d) : %s" % (i['section'], j, fdA, numOfQuestions, i['answer']))
-    j = j + 1
-    #push(i)
+    __startSearch(numOfQuestions, threadNum, __getQuestionDict(q))
+    return {"questionNum": numOfQuestions, "answerDicts": __answerDicts}
