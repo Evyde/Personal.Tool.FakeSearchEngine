@@ -1,7 +1,7 @@
 from urllib import parse
 import requests
 import re
-import Exceptions
+from . import Exceptions
 from utils import getter
 import configparser
 import threading
