@@ -1,5 +1,5 @@
 from django.shortcuts import render
-import models
+from . import models
 
 def index(request):
     return render(request, 'Google.html')
