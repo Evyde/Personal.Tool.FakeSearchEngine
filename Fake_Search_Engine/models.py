@@ -2,7 +2,7 @@ from urllib import parse
 import requests
 import re
 from . import Exceptions
-from . import utils.getter
+from . import utils
 import configparser
 import threading
 from functools import cmp_to_key
@@ -30,7 +30,7 @@ def __findAnswer(a, times, source=None):
         source = a.copy()
     if times > 4:
         raise Exceptions.NoAnswerFoundAtAll
-    g = getter()
+    g = utils.getter()
     tmpStr = ""
     # 此处由API总数决定
     romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
@@ -62,10 +62,9 @@ def __findAnswer(a, times, source=None):
 
 def __threadSearch(qDicts):
     global searched, tasks
-    for i in qDicts:
-        a = __findAnswer(i, 0, i)
-        if a['answer'] != "":
-            __save(a)
+    a = __findAnswer(qDicts, 0, qDicts)
+    if a['answer'] != "":
+        __save(a)
 
 
 def __textProcess(text, times):
@@ -116,27 +115,39 @@ def __startSearch(tasks, threadNum=1, questionDicts=None):
         questionDicts = []
     global __answerDicts
     t = []
-    for i in range(0, threadNum):
-        maxRange = tasks * (i + 1) / threadNum + 1
-        minRange = tasks * i / threadNum + 1
-        t.append(threading.Thread(target=__threadSearch, args=(questionDicts[minRange: maxRange])))
-        t[i].start()
-    for i in t:
-        i.join()
+    # for i in range(0, threadNum):
+    #     maxRange = int(tasks * (i + 1) / threadNum + 1)
+    #     minRange = int(tasks * i / threadNum + 1)
+    #     print(f"{minRange}-{maxRange}")
+    #     t.append(threading.Thread(target=__threadSearch, args=(questionDicts[minRange: maxRange])))
+    #     t[i].start()
+    # for i in t:
+    #     i.join()
+    for i in questionDicts:
+        __threadSearch(i)
     __answerDicts.sort(key=cmp_to_key(__sortByEleID))
 
 
 def __detectQuestionNum(questions):
     # 最后一题题号 - 第一题题号
-    return int(str(questions).split('.')[-1]) - int(str(questions).split('.')[0])
+    tmpQList = re.split(r'(\d+\.)', questions)
+    for i in tmpQList:
+        if i == "":
+            tmpQList.remove(i)
+    print(int(tmpQList[-2].replace('.', "")) - int(tmpQList[0].replace('.', "")))
+    return int(tmpQList[-2].replace('.', "")) - int(tmpQList[0].replace('.', "")) + 1
 
 
 def __getQuestionDict(q):
     i = 0
-    tmpList = re.split(r"(\d+)\.", q)
+    tmpList = re.split(r'(\d+\.)', q)
+    for i in tmpList:
+        if i == "":
+            tmpList.remove(i)
+    i = 0
     questionDicts = []
     for qs in tmpList:
-        if i / 2 == 0:
+        if i % 2 == 0:
             questionDicts.append({"id": qs, "question": ""})
         else:
             questionDicts[int((i - 1) / 2)]['question'] = qs
@@ -147,16 +158,19 @@ def __getQuestionDict(q):
 def searchFromInputBox(questions):
     initFlag = True
     nowNum = 0
-    threadNum = 1
+    threadNum = 2
+    numOfQuestions = 0
     while initFlag:
         try:
             numOfQuestions = __detectQuestionNum(questions)
         except:
-            return [{"question": "Error!", "answer": "提取题号错误！"}]
+            print("TWF???")
+            return {"questionNum": numOfQuestions, "answerDicts": [{"question": "Error!", "answer": "提取题号错误！"}]}
         else:
             initFlag = False
 
     q = __textProcess(questions, 1)
     nowNum += 1
     __startSearch(numOfQuestions, threadNum, __getQuestionDict(q))
+    print(__answerDicts)
     return {"questionNum": numOfQuestions, "answerDicts": __answerDicts}
