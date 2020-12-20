@@ -2,7 +2,7 @@ from urllib import parse
 import requests
 import re
 from . import Exceptions
-from utils import getter
+from . import utils.getter
 import configparser
 import threading
 from functools import cmp_to_key
