@@ -1,7 +1,7 @@
 import requests
 from urllib import parse
 import json
-import Exceptions
+from . import Exceptions
 
 
 class getter:
