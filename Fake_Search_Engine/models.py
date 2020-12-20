@@ -105,8 +105,7 @@ def detectQuestion(question):
 
 
 def getFromBaidu(question):
-    # 拟加入返回百度和百度知道的搜索地址<a href>
-    pass
+    return str(f"没有，前往<a href=\"https://zhidao.baidu.com/search?word={question}\">百度知道</a>或者<a href=\"https://www.baidu.com/s?q={question}\">百度</a>")
 
 
 def findAnswer(a, times, source=None):
