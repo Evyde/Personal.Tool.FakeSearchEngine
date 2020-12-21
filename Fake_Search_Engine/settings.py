@@ -25,7 +25,7 @@ SECRET_KEY = 's&vl)ae5e7z36hny7-4o)c_p0+un%+ej7m23y54nahwel(s8hm'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["0.0.0.0", "evyde.life", "*.evyde.life", "localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["0.0.0.0", "s.evyde.life", "*.evyde.life", "localhost", "127.0.0.1"]
 
 
 # Application definition

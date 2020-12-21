@@ -205,7 +205,6 @@ def __getQuestionDict(q):
 def searchFromInputBox(questions):
     global __answerDicts
     initFlag = True
-    nowNum = 0
     threadNum = 2
     numOfQuestions = 0
     __answerDicts = []
@@ -215,11 +214,10 @@ def searchFromInputBox(questions):
         except:
             qlist = {'id': 1, 'question': __textProcess(questions, 1)}
             print(__findAnswer(qlist, 0, qlist))
-            return {"questionNum": numOfQuestions, "answerDicts": [__findAnswer(qlist, 0, qlist)]}
+            return {"questionNum": numOfQuestions + 1, "answerDicts": [__findAnswer(qlist, 0, qlist)]}
         else:
             initFlag = False
 
     q = __textProcess(questions, 1)
-    nowNum += 1
     __startSearch(numOfQuestions, threadNum, __getQuestionDict(q))
     return {"questionNum": numOfQuestions, "answerDicts": __answerDicts}
