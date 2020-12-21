@@ -1,6 +1,8 @@
-import requests
-from urllib import parse
 import json
+from urllib import parse
+
+import requests
+
 from . import Exceptions
 
 
@@ -32,8 +34,9 @@ class getter:
     def API4(self, a):
         url = "https://api.gochati.cn/jsapi.php?"
         tmp = json.loads(requests.get(url + "q=" + parse.quote(a['q']) + "&token=" + a['token']).text)
-        r = {'answer': "", 'status': False}
-        if tmp['msg'] != "可能过几天就有这道题了":
+        r = {'answer': "", 'status': False, "tm": ""}
+        if tmp['tm'] != "未查到该题，已收录到后台，过几天再来试试吧~":
             r['status'] = True
             r['answer'] = self.__oneToSharp(tmp['da'])
+            r['tm'] = self.__oneToSharp(tmp['tm'])
         return r
